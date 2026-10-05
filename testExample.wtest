@@ -1,9 +1,96 @@
-import example.pepita
+import example.*
+describe "Tests del Modelo de Plagas y Elementos" {
+  const hogarLimpio = new Hogar(nivelDeMugre = 10, confort = 30)   // Bueno: mugre (10) <= confort/2 (15)
+  const hogarSucio = new Hogar(nivelDeMugre = 50, confort = 20)    // No bueno
+  
+  const huertaBuena = new Huerta(capacidadProduccion = 150)        // Bueno: 150 > 100 (nivel base)
+  const huertaMala = new Huerta(capacidadProduccion = 80)          // No bueno
+  
+  const mascotaSana = new Mascota(nivelDeSalud = 300)              // Bueno: 300 > 250
+  const mascotaEnferma = new Mascota(nivelDeSalud = 100)          // No bueno
 
-describe "group of tests for pepita" {
+  // --- Instancias de Plagas ---
+  const plagaCucarachas = new Cucarachas(poblacion = 30, pesoPromedio = 12)
+  const plagaPulgas = new Pulgas(poblacion = 8)
+  const plagaGarrapatas = new Garrapatas(poblacion = 20)
+  const plagaMosquitos = new Mosquitos(poblacion = 15)
 
-  test "pepita has initial energy" {
-    assert.equals(100, pepita.energy())
+  // Elementos Buenos
+
+  test "Verificación de elementos buenos y no buenos" {
+    assert.that(hogarLimpio.esBueno())
+    assert.notThat(hogarSucio.esBueno())
+
+    assert.that(huertaBuena.esBueno())
+    assert.notThat(huertaMala.esBueno())
+
+    assert.that(mascotaSana.esBueno())
+    assert.notThat(mascotaEnferma.esBueno())
+  }
+  // Barrio Copado
+  test "Barrio copado cuando tiene más elementos buenos que no buenos" {
+    const barrioCopado = new Barrio(elementos = [hogarLimpio, huertaBuena, mascotaSana, hogarSucio])
+    assert.that(barrioCopado.esCopado()) // 3 buenos vs 1 no bueno
   }
 
+  test "Barrio no copado cuando no predominan los buenos" {
+    const barrioNoCopado = new Barrio(elementos = [hogarLimpio, hogarSucio, huertaMala, mascotaEnferma])
+    assert.notThat(barrioNoCopado.esCopado()) // 1 bueno vs 3 no buenos
+  }
+
+  // Daño y Transmisión de Enfermedades
+ 
+  test "Calculo de daño y transmisión de enfermedades en Cucarachas" {
+    assert.equals(15, plagaCucarachas.nivelDeDaño()) // 30 / 2
+    assert.that(plagaCucarachas.transmiteEnfermedades()) // poblacion >= 10 y peso >= 10
+  }
+
+  test "Mosquitos no transmiten enfermedades si la población no es múltiplo de 3" {
+    const mosquitosNoMultiplo = new Mosquitos(poblacion = 10)
+    assert.notThat(mosquitosNoMultiplo.transmiteEnfermedades())
+  }
+
+  // Efectos de Ataques (Combinado Elemento + Plaga)
+
+  test "Ataque a un Hogar aumenta la mugre según el daño previo de la plaga y luego aumenta la plaga" {
+    // Daño inicial de cucarachas: 30 / 2 = 15
+    plagaCucarachas.atacar(hogarLimpio)
+
+    // Mugre del hogar: 10 + 15 = 25
+    assert.equals(25, hogarLimpio.nivelDeMugre())
+
+    // Población de plaga aumenta 10%: 30 + 3 = 33
+    assert.equals(33, plagaCucarachas.poblacion())
+    // Peso promedio de cucarachas aumenta en 2: 12 + 2 = 14
+    assert.equals(14, plagaCucarachas.pesoPromedio())
+  }
+
+  test "Ataque a una Huerta aplica reducción del 10% de daño + 10 extra si transmite enfermedad" {
+    // plagaMosquitos: poblacion = 15 -> daño = 15, transmiteEnfermedades = true (15 >= 10 y 15 % 3 == 0)
+    plagaMosquitos.atacar(huertaBuena)
+
+    // Reducción esperada: (15 * 0.1) + 10 = 1.5 + 10 = 11.5
+    // Producción final: 150 - 11.5 = 138.5
+    assert.equals(138.5, huertaBuena.capacidadProduccion())
+  }
+
+  test "Ataque de Pulgas a Mascota no afecta la salud si no transmite enfermedades" {
+    // plagaPulgas: poblacion = 8 -> no transmite enfermedades (< 10)
+    plagaPulgas.atacar(mascotaSana)
+
+    // La salud de la mascota se mantiene intacta
+    assert.equals(300, mascotaSana.nivelDeSalud())
+    // La población de pulgas aumenta un 10%: 8 + 0.8 = 8.8
+    assert.equals(8.8, plagaPulgas.poblacion())
+  }
+
+  test "Ataque de Garrapatas aumenta su población un 20%" {
+    // plagaGarrapatas: poblacion = 20 -> daño = 40, transmiteEnfermedades = true
+    plagaGarrapatas.atacar(mascotaSana)
+
+    // Mascota pierde salud = nivelDeDaño (40): 300 - 40 = 260
+    assert.equals(260, mascotaSana.nivelDeSalud())
+    // Población de garrapatas aumenta un 20%: 20 + 4 = 24
+    assert.equals(24, plagaGarrapatas.poblacion())
+  }
 }
